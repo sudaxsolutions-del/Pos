@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudax POS Pro - نظام مبيعات احترافي</title>
+
+<style>
+body {
+    font-family: Arial;
+    margin: 0;
+    background: #f4f6f8;
+}
+
+header {
+    background: #0b4f8c;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-size: 18px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    padding: 10px;
+}
+
+.box {
+    background: white;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: 85vh;
+    overflow-y: auto;
+}
+
+input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+}
+
+button {
+    border: none;
+    background: #00b4d8;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0096c7;
+}
+
+.product, .cart-item, .sale-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+}
+
+.total {
+    font-weight: bold;
+    font-size: 18px;
+    margin-top: 10px;
+}
+
+.small {
+    font-size: 12px;
+    background: red;
+    padding: 3px 6px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+Sudax POS Pro - نظام مبيعات احترافي
+</header>
+
+<div class="container">
+
+<!-- PRODUCTS -->
+<div class="box">
+<h3>المنتجات</h3>
+
+<input id="name" placeholder="اسم المنتج">
+<input id="price" placeholder="السعر" type="number">
+<button onclick="addProduct()">إضافة منتج</button>
+
+<div id="products"></div>
+</div>
+
+<!-- CART -->
+<div class="box">
+<h3>سلة البيع</h3>
+<div id="cart"></div>
+
+<div class="total">
+الإجمالي: <span id="total">0</span>
+</div>
+
+<button onclick="checkout()">إتمام البيع</button>
+<button onclick="clearCart()" style="background:red;">تفريغ</button>
+
+<hr>
+
+<h4>آخر فاتورة</h4>
+<div id="lastInvoice"></div>
+
+<button onclick="printInvoice()">طباعة الفاتورة</button>
+</div>
+
+<!-- SALES -->
+<div class="box">
+<h3>سجل المبيعات</h3>
+<div id="sales"></div>
+</div>
+
+</div>
+
+<script>
+let products = JSON.parse(localStorage.getItem("products")) || [];
+let sales = JSON.parse(localStorage.getItem("sales")) || [];
+let cart = [];
+let lastInvoice = null;
+
+function save(){
+    localStorage.setItem("products", JSON.stringify(products));
+    localStorage.setItem("sales", JSON.stringify(sales));
+}
+
+/* PRODUCTS */
+function addProduct(){
+    let name = document.getElementById("name").value;
+    let price = Number(document.getElementById("price").value);
+
+    if(!name || !price) return;
+
+    products.push({name, price});
+    save();
+    renderProducts();
+}
+
+function renderProducts(){
+    document.getElementById("products").innerHTML =
+    products.map((p,i)=>`
+        <div class="product">
+            <span>${p.name} - ${p.price}</span>
+            <button onclick="addToCart(${i})">+</button>
+        </div>
+    `).join("");
+}
+
+/* CART */
+function addToCart(i){
+    cart.push(products[i]);
+    renderCart();
+}
+
+function renderCart(){
+    let total = cart.reduce((a,b)=>a+b.price,0);
+
+    document.getElementById("cart").innerHTML =
+    cart.map((c,i)=>`
+        <div class="cart-item">
+            <span>${c.name} - ${c.price}</span>
+            <button class="small" onclick="removeItem(${i})">X</button>
+        </div>
+    `).join("");
+
+    document.getElementById("total").innerText = total;
+}
+
+function removeItem(i){
+    cart.splice(i,1);
+    renderCart();
+}
+
+function clearCart(){
+    cart = [];
+    renderCart();
+}
+
+/* CHECKOUT */
+function checkout(){
+    if(cart.length === 0) return;
+
+    let invoice = {
+        id: "INV-" + Date.now(),
+        date: new Date().toLocaleString(),
+        items: cart,
+        total: cart.reduce((a,b)=>a+b.price,0)
+    };
+
+    sales.push(invoice);
+    lastInvoice = invoice;
+
+    save();
+    cart = [];
+
+    renderCart();
+    renderSales();
+    renderLastInvoice();
+}
+
+/* SALES */
+function renderSales(){
+    document.getElementById("sales").innerHTML =
+    sales.slice().reverse().map(s=>`
+        <div class="sale-item">
+            <div>
+                <b>${s.id}</b><br>
+                ${s.date}
+            </div>
+            <div>${s.total}</div>
+        </div>
+    `).join("");
+}
+
+/* INVOICE */
+function renderLastInvoice(){
+    if(!lastInvoice) return;
+
+    document.getElementById("lastInvoice").innerHTML = `
+        <b>${lastInvoice.id}</b><br>
+        ${lastInvoice.date}<br>
+        الإجمالي: ${lastInvoice.total}
+    `;
+}
+
+/* PRINT */
+function printInvoice(){
+    if(!lastInvoice) return;
+
+    let w = window.open();
+    w.document.write(`
+        <h2>Sudax POS Invoice</h2>
+        <p>${lastInvoice.id}</p>
+        <p>${lastInvoice.date}</p>
+        <hr>
+        ${lastInvoice.items.map(i=>`<p>${i.name} - ${i.price}</p>`).join("")}
+        <hr>
+        <h3>Total: ${lastInvoice.total}</h3>
+    `);
+    w.print();
+}
+
+renderProducts();
+renderSales();
+</script>
+
+</body>
+</html>
